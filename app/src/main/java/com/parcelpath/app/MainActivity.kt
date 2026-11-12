@@ -287,21 +287,53 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun osrmTrip(lat: Double, lon: Double, points: List<ParcelStop>): List<ParcelStop>? = try {
-        val coords = (listOf("$lon,$lat") + points.map { "${it.lon},${it.lat}" }).joinToString(";")
-        val connection = URL("https://router.project-osrm.org/trip/v1/driving/$coords?roundtrip=false&source=first&destination=last&overview=false")
-            .openConnection() as HttpURLConnection
-        connection.connectTimeout = 15000; connection.readTimeout = 20000
-        val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+    
+private fun osrmTrip(
+    lat: Double,
+    lon: Double,
+    points: List<ParcelStop>
+): List<ParcelStop>? {
+    return try {
+        val coords = (
+            listOf("$lon,$lat") +
+            points.map { "${it.lon},${it.lat}" }
+        ).joinToString(";")
+
+        val connection = URL(
+            "https://router.project-osrm.org/trip/v1/driving/$coords?roundtrip=false&source=first&destination=last&overview=false"
+        ).openConnection() as HttpURLConnection
+
+        connection.connectTimeout = 15000
+        connection.readTimeout = 20000
+
+        val json = JSONObject(
+            connection.inputStream.bufferedReader().use { it.readText() }
+        )
+
         connection.disconnect()
-        if (json.optString("code") != "Ok") return null
+
+        if (json.optString("code") != "Ok") {
+            return null
+        }
+
         val waypoints = json.getJSONArray("waypoints")
+
         val sorted = (1 until waypoints.length()).map { i ->
-            val wp = waypoints.getJSONObject(i)
-            wp.getInt("waypoint_index") to (i - 1)
+            val waypoint = waypoints.getJSONObject(i)
+            waypoint.getInt("waypoint_index") to (i - 1)
         }.sortedBy { it.first }
-        if (sorted.size != points.size) null else sorted.map { points[it.second] }
-    } catch (_: Exception) { null }
+
+        if (sorted.size != points.size) {
+            null
+        } else {
+            sorted.map { points[it.second] }
+        }
+
+    } catch (e: Exception) {
+        null
+    }
+}
+
 
     private fun nearestNeighbour(lat: Double, lon: Double, points: List<ParcelStop>): List<ParcelStop> {
         val remaining = points.toMutableList()
